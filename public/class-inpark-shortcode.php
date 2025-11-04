@@ -9,8 +9,15 @@ class Inpark_Public_Shortcode {
     public function render($atts){
         $nonce = wp_create_nonce('inpark_reserva_nonce');
         $catering = get_option('inpark_catering_items', array());
+        if (!is_array($catering)) {
+            $catering = array();
+        }
+
         $conditional_fields = get_option('inpark_conditional_fields', array());
-        
+        if (!is_array($conditional_fields)) {
+            $conditional_fields = array();
+        }
+
         // Separar catering por categoria
         $alimentacao = array_filter($catering, function($item) {
             return ($item['categoria'] ?? 'alimentacao') === 'alimentacao';
