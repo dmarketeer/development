@@ -86,15 +86,22 @@ class Frontend {
      * Register public endpoint that reads from DB.
      */
     public function register_public_endpoint() {
-        register_rest_route(
-            'oportunidades/v1',
-            '/list',
-            [
-                'methods'  => 'GET',
-                'callback' => [ $this, 'handle_list' ],
-                'permission_callback' => '__return_true',
-            ]
-        );
+        $routes = [
+            [ 'namespace' => 'oportunidades/v1', 'route' => '/list' ],
+            [ 'namespace' => 'dmarketeer/v1', 'route' => '/opportunities' ],
+        ];
+
+        foreach ( $routes as $route ) {
+            register_rest_route(
+                $route['namespace'],
+                $route['route'],
+                [
+                    'methods'             => 'GET',
+                    'callback'            => [ $this, 'handle_list' ],
+                    'permission_callback' => '__return_true',
+                ]
+            );
+        }
     }
 
     /**
