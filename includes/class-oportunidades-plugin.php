@@ -16,7 +16,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 require_once __DIR__ . '/trait-singleton.php';
 require_once __DIR__ . '/class-database.php';
 require_once __DIR__ . '/class-importer.php';
-require_once __DIR__ . '/class-github-fetcher.php';
+require_once __DIR__ . '/class-google-sheets-fetcher.php';
 require_once __DIR__ . '/class-rest-api.php';
 require_once __DIR__ . '/class-admin.php';
 require_once __DIR__ . '/class-frontend.php';

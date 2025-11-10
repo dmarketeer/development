@@ -29,10 +29,10 @@ class Admin {
         add_action( 'admin_menu', [ $this, 'register_menu' ] );
         add_action( 'admin_init', [ $this, 'register_settings' ] );
         add_action( 'admin_post_oportunidades_import', [ $this, 'handle_manual_import' ] );
-        add_action( 'admin_post_oportunidades_github_sync', [ $this, 'handle_github_sync' ] );
+        add_action( 'admin_post_oportunidades_sheets_sync', [ $this, 'handle_sheets_sync' ] );
         add_action( 'admin_post_oportunidades_reset', [ $this, 'handle_reset' ] );
         add_action( 'admin_enqueue_scripts', [ $this, 'enqueue_assets' ] );
-        add_action( 'wp_ajax_oportunidades_validate_github', [ $this, 'handle_validate_github' ] );
+        add_action( 'wp_ajax_oportunidades_validate_sheets', [ $this, 'handle_validate_sheets' ] );
     }
 
     /**
@@ -106,30 +106,30 @@ class Admin {
             'oportunidades_general'
         );
 
-        add_settings_section( 'oportunidades_github', __( 'Integração GitHub', 'oportunidades' ), '__return_false', 'oportunidades' );
+        add_settings_section( 'oportunidades_sheets', __( 'Integração Google Sheets', 'oportunidades' ), '__return_false', 'oportunidades' );
 
         add_settings_field(
-            'github_repo_url',
-            __( 'URL do Repositório GitHub', 'oportunidades' ),
-            [ $this, 'render_github_repo_url_field' ],
+            'sheets_spreadsheet_id',
+            __( 'ID da Planilha Google', 'oportunidades' ),
+            [ $this, 'render_sheets_spreadsheet_id_field' ],
             'oportunidades',
-            'oportunidades_github'
+            'oportunidades_sheets'
         );
 
         add_settings_field(
-            'github_branch',
-            __( 'Branch', 'oportunidades' ),
-            [ $this, 'render_github_branch_field' ],
+            'sheets_range',
+            __( 'Intervalo de Dados (Range)', 'oportunidades' ),
+            [ $this, 'render_sheets_range_field' ],
             'oportunidades',
-            'oportunidades_github'
+            'oportunidades_sheets'
         );
 
         add_settings_field(
-            'github_file_path',
-            __( 'Caminho do Ficheiro de Dados', 'oportunidades' ),
-            [ $this, 'render_github_file_path_field' ],
+            'sheets_api_key',
+            __( 'API Key do Google', 'oportunidades' ),
+            [ $this, 'render_sheets_api_key_field' ],
             'oportunidades',
-            'oportunidades_github'
+            'oportunidades_sheets'
         );
     }
 
@@ -150,32 +150,10 @@ class Admin {
             $settings['default_filters'] = [];
         }
 
-        // Handle GitHub URL with validation
-        $github_url = isset( $settings['github_repo_url'] ) ? trim( $settings['github_repo_url'] ) : '';
-        if ( ! empty( $github_url ) ) {
-            $sanitized_url = esc_url_raw( $github_url );
-            // Validate it's a GitHub URL
-            if ( ! empty( $sanitized_url ) && strpos( $sanitized_url, 'github.com' ) !== false ) {
-                $settings['github_repo_url'] = $sanitized_url;
-            } else {
-                // Keep the old value if URL is invalid
-                $old_settings = get_option( OPORTUNIDADES_OPTION_NAME, [] );
-                $settings['github_repo_url'] = $old_settings['github_repo_url'] ?? '';
-                add_settings_error(
-                    'oportunidades_settings',
-                    'invalid_github_url',
-                    __( 'URL do GitHub inválida. Use o formato: https://github.com/owner/repo', 'oportunidades' ),
-                    'error'
-                );
-            }
-        } else {
-            // Keep the old value if empty
-            $old_settings = get_option( OPORTUNIDADES_OPTION_NAME, [] );
-            $settings['github_repo_url'] = $old_settings['github_repo_url'] ?? '';
-        }
-
-        $settings['github_branch']       = sanitize_text_field( $settings['github_branch'] ?? 'main' );
-        $settings['github_file_path']    = sanitize_text_field( $settings['github_file_path'] ?? 'output/oportunidades.json' );
+        // Handle Google Sheets configuration
+        $settings['sheets_spreadsheet_id'] = sanitize_text_field( $settings['sheets_spreadsheet_id'] ?? '' );
+        $settings['sheets_range']          = sanitize_text_field( $settings['sheets_range'] ?? 'Sheet1' );
+        $settings['sheets_api_key']        = sanitize_text_field( $settings['sheets_api_key'] ?? '' );
 
         return $settings;
     }
@@ -253,47 +231,42 @@ class Admin {
     }
 
     /**
-     * Render GitHub repository URL field.
+     * Render Google Sheets Spreadsheet ID field.
      */
-    public function render_github_repo_url_field() {
+    public function render_sheets_spreadsheet_id_field() {
         $settings = get_option( OPORTUNIDADES_OPTION_NAME, [] );
-        $value    = $settings['github_repo_url'] ?? '';
-
-        // Set default value if empty
-        if ( empty( $value ) ) {
-            $value = 'https://github.com/dmarketeer/import-diariodarepublica-serie-ii';
-        }
+        $value    = $settings['sheets_spreadsheet_id'] ?? '';
         ?>
-        <input type="url" name="<?php echo esc_attr( OPORTUNIDADES_OPTION_NAME . '[github_repo_url]' ); ?>" value="<?php echo esc_attr( $value ); ?>" class="regular-text" placeholder="https://github.com/user/repo" required />
-        <p class="description"><?php esc_html_e( 'URL completa do repositório GitHub (ex.: https://github.com/user/repo)', 'oportunidades' ); ?></p>
+        <input type="text" name="<?php echo esc_attr( OPORTUNIDADES_OPTION_NAME . '[sheets_spreadsheet_id]' ); ?>" value="<?php echo esc_attr( $value ); ?>" class="regular-text" placeholder="1A2B3C4D5E6F7G8H9I0J" required />
+        <p class="description"><?php esc_html_e( 'ID da planilha Google (encontrado na URL: docs.google.com/spreadsheets/d/[ID]/edit)', 'oportunidades' ); ?></p>
         <?php
     }
 
     /**
-     * Render GitHub branch field.
+     * Render Google Sheets Range field.
      */
-    public function render_github_branch_field() {
+    public function render_sheets_range_field() {
         $settings = get_option( OPORTUNIDADES_OPTION_NAME, [] );
-        $value    = $settings['github_branch'] ?? 'main';
+        $value    = $settings['sheets_range'] ?? 'Sheet1';
         ?>
-        <input type="text" name="<?php echo esc_attr( OPORTUNIDADES_OPTION_NAME . '[github_branch]' ); ?>" value="<?php echo esc_attr( $value ); ?>" class="regular-text" placeholder="main" />
-        <p class="description"><?php esc_html_e( 'Branch do repositório a usar (ex.: main, master, develop)', 'oportunidades' ); ?></p>
+        <input type="text" name="<?php echo esc_attr( OPORTUNIDADES_OPTION_NAME . '[sheets_range]' ); ?>" value="<?php echo esc_attr( $value ); ?>" class="regular-text" placeholder="Sheet1" />
+        <p class="description"><?php esc_html_e( 'Intervalo de dados a buscar (ex.: Sheet1, Dados!A1:Z1000)', 'oportunidades' ); ?></p>
         <?php
     }
 
     /**
-     * Render GitHub file path field.
+     * Render Google Sheets API Key field.
      */
-    public function render_github_file_path_field() {
+    public function render_sheets_api_key_field() {
         $settings = get_option( OPORTUNIDADES_OPTION_NAME, [] );
-        $value    = $settings['github_file_path'] ?? 'output/oportunidades.json';
+        $value    = $settings['sheets_api_key'] ?? '';
         ?>
-        <input type="text" name="<?php echo esc_attr( OPORTUNIDADES_OPTION_NAME . '[github_file_path]' ); ?>" value="<?php echo esc_attr( $value ); ?>" class="regular-text" placeholder="output/oportunidades.json" />
-        <button type="button" id="validate-github-config" class="button button-secondary" style="margin-left: 10px;">
+        <input type="text" name="<?php echo esc_attr( OPORTUNIDADES_OPTION_NAME . '[sheets_api_key]' ); ?>" value="<?php echo esc_attr( $value ); ?>" class="regular-text" placeholder="AIzaSy..." required />
+        <button type="button" id="validate-sheets-config" class="button button-secondary" style="margin-left: 10px;">
             <?php esc_html_e( 'Validar Configuração', 'oportunidades' ); ?>
         </button>
-        <p class="description"><?php esc_html_e( 'Caminho relativo para o ficheiro JSON no repositório', 'oportunidades' ); ?></p>
-        <div id="github-validation-result" style="margin-top: 10px;"></div>
+        <p class="description"><?php esc_html_e( 'API Key do Google Cloud Console (necessita ter a Google Sheets API habilitada)', 'oportunidades' ); ?></p>
+        <div id="sheets-validation-result" style="margin-top: 10px;"></div>
         <?php
     }
 
@@ -347,15 +320,15 @@ class Admin {
             </form>
 
             <hr />
-            <h2><?php esc_html_e( 'Sincronizar do GitHub', 'oportunidades' ); ?></h2>
+            <h2><?php esc_html_e( 'Sincronizar do Google Sheets', 'oportunidades' ); ?></h2>
             <form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
-                <?php wp_nonce_field( 'oportunidades_github_sync' ); ?>
-                <input type="hidden" name="action" value="oportunidades_github_sync" />
+                <?php wp_nonce_field( 'oportunidades_sheets_sync' ); ?>
+                <input type="hidden" name="action" value="oportunidades_sheets_sync" />
                 <p class="description">
                     <?php
-                    $last_github_fetch = get_option( 'oportunidades_last_github_fetch' );
-                    if ( $last_github_fetch ) {
-                        echo esc_html( sprintf( __( 'Última sincronização: %s', 'oportunidades' ), get_date_from_gmt( $last_github_fetch, 'd/m/Y H:i' ) ) );
+                    $last_sheets_fetch = get_option( 'oportunidades_last_sheets_fetch' );
+                    if ( $last_sheets_fetch ) {
+                        echo esc_html( sprintf( __( 'Última sincronização: %s', 'oportunidades' ), get_date_from_gmt( $last_sheets_fetch, 'd/m/Y H:i' ) ) );
                     } else {
                         echo esc_html__( 'Nunca sincronizado', 'oportunidades' );
                     }
@@ -393,20 +366,20 @@ class Admin {
     }
 
     /**
-     * Handle GitHub synchronization.
+     * Handle Google Sheets synchronization.
      */
-    public function handle_github_sync() {
-        if ( ! current_user_can( 'manage_options' ) || ! check_admin_referer( 'oportunidades_github_sync' ) ) {
+    public function handle_sheets_sync() {
+        if ( ! current_user_can( 'manage_options' ) || ! check_admin_referer( 'oportunidades_sheets_sync' ) ) {
             wp_die( esc_html__( 'Sem permissões.', 'oportunidades' ) );
         }
 
-        require_once __DIR__ . '/class-github-fetcher.php';
+        require_once __DIR__ . '/class-google-sheets-fetcher.php';
 
-        $github_fetcher = new GitHub_Fetcher();
+        $sheets_fetcher = new Google_Sheets_Fetcher();
         $settings       = get_option( OPORTUNIDADES_OPTION_NAME, [] );
 
         try {
-            $summary = $github_fetcher->fetch_and_import( $this->importer, $settings );
+            $summary = $sheets_fetcher->fetch_and_import( $this->importer, $settings );
             set_transient( 'oportunidades_last_summary', $summary, MINUTE_IN_SECONDS * 30 );
         } catch ( Exception $e ) {
             set_transient( 'oportunidades_last_errors', [ $e->getMessage() ], MINUTE_IN_SECONDS * 30 );
@@ -491,31 +464,36 @@ class Admin {
     }
 
     /**
-     * Handle AJAX request to validate GitHub configuration.
+     * Handle AJAX request to validate Google Sheets configuration.
      */
-    public function handle_validate_github() {
-        check_ajax_referer( 'oportunidades_validate_github', 'nonce' );
+    public function handle_validate_sheets() {
+        check_ajax_referer( 'oportunidades_validate_sheets', 'nonce' );
 
         if ( ! current_user_can( 'manage_options' ) ) {
             wp_send_json_error( [ 'message' => __( 'Sem permissões.', 'oportunidades' ) ] );
         }
 
-        $repo_url  = isset( $_POST['repo_url'] ) ? sanitize_text_field( wp_unslash( $_POST['repo_url'] ) ) : '';
-        $branch    = isset( $_POST['branch'] ) ? sanitize_text_field( wp_unslash( $_POST['branch'] ) ) : 'main';
-        $file_path = isset( $_POST['file_path'] ) ? sanitize_text_field( wp_unslash( $_POST['file_path'] ) ) : 'output/oportunidades.json';
+        $spreadsheet_id = isset( $_POST['spreadsheet_id'] ) ? sanitize_text_field( wp_unslash( $_POST['spreadsheet_id'] ) ) : '';
+        $range          = isset( $_POST['range'] ) ? sanitize_text_field( wp_unslash( $_POST['range'] ) ) : 'Sheet1';
+        $api_key        = isset( $_POST['api_key'] ) ? sanitize_text_field( wp_unslash( $_POST['api_key'] ) ) : '';
 
-        if ( empty( $repo_url ) ) {
-            wp_send_json_error( [ 'message' => __( 'URL do repositório é obrigatória.', 'oportunidades' ) ] );
+        if ( empty( $spreadsheet_id ) ) {
+            wp_send_json_error( [ 'message' => __( 'ID da planilha é obrigatório.', 'oportunidades' ) ] );
         }
 
-        $fetcher = new GitHub_Fetcher();
-        $result  = $fetcher->validate_config( $repo_url, $branch, $file_path );
+        if ( empty( $api_key ) ) {
+            wp_send_json_error( [ 'message' => __( 'API Key é obrigatória.', 'oportunidades' ) ] );
+        }
+
+        require_once __DIR__ . '/class-google-sheets-fetcher.php';
+        $fetcher = new Google_Sheets_Fetcher();
+        $result  = $fetcher->validate_config( $spreadsheet_id, $range, $api_key );
 
         if ( is_wp_error( $result ) ) {
             wp_send_json_error( [ 'message' => $result->get_error_message() ] );
         }
 
-        wp_send_json_success( [ 'message' => __( 'Configuração válida! O ficheiro foi encontrado no repositório.', 'oportunidades' ) ] );
+        wp_send_json_success( [ 'message' => __( 'Configuração válida! A planilha foi encontrada e está acessível.', 'oportunidades' ) ] );
     }
 
     /**
@@ -556,7 +534,7 @@ class Admin {
             [
                 'restUrl'       => rest_url( 'oportunidades/v1/import' ),
                 'nonce'         => wp_create_nonce( 'wp_rest' ),
-                'validateNonce' => wp_create_nonce( 'oportunidades_validate_github' ),
+                'validateNonce' => wp_create_nonce( 'oportunidades_validate_sheets' ),
                 'token'         => get_option( OPORTUNIDADES_OPTION_NAME, [] )['api_token'] ?? '',
                 'summary'       => get_transient( 'oportunidades_last_summary' ),
                 'tableData'     => $this->database->query_records( [ 'per_page' => 50 ] ),
