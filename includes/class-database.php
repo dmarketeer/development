@@ -1,6 +1,7 @@
 <?php
 namespace Oportunidades\Includes;
 
+use Exception;
 use wpdb;
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -210,5 +211,20 @@ class Database {
         }
 
         return $row;
+    }
+
+    /**
+     * Remove all stored records.
+     *
+     * @throws Exception When the operation fails.
+     */
+    public function reset() {
+        $table = OPORTUNIDADES_TABLE_NAME;
+
+        $result = $this->wpdb->query( "TRUNCATE TABLE {$table}" );
+
+        if ( false === $result ) {
+            throw new Exception( __( 'Não foi possível limpar os registos.', 'oportunidades' ) );
+        }
     }
 }
