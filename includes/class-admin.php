@@ -140,9 +140,39 @@ class Admin {
         $settings['sync_interval']       = isset( $settings['sync_interval'] ) ? absint( $settings['sync_interval'] ) : 1440;
         $settings['local_file']          = sanitize_text_field( $settings['local_file'] ?? '' );
         $settings['notification_emails'] = implode( ',', array_filter( array_map( 'sanitize_email', explode( ',', $settings['notification_emails'] ?? '' ) ) ) );
-        $settings['default_filters']     = array_filter( array_map( 'sanitize_text_field', explode( ',', $settings['default_filters'] ?? '' ) ) );
         $settings['custom_field_map']    = sanitize_textarea_field( $settings['custom_field_map'] ?? '' );
-        $settings['github_repo_url']     = esc_url_raw( $settings['github_repo_url'] ?? '' );
+
+        // Handle default_filters - convert string to array
+        if ( isset( $settings['default_filters'] ) && is_string( $settings['default_filters'] ) ) {
+            $settings['default_filters'] = array_filter( array_map( 'sanitize_text_field', explode( ',', $settings['default_filters'] ) ) );
+        } else {
+            $settings['default_filters'] = [];
+        }
+
+        // Handle GitHub URL with validation
+        $github_url = isset( $settings['github_repo_url'] ) ? trim( $settings['github_repo_url'] ) : '';
+        if ( ! empty( $github_url ) ) {
+            $sanitized_url = esc_url_raw( $github_url );
+            // Validate it's a GitHub URL
+            if ( ! empty( $sanitized_url ) && strpos( $sanitized_url, 'github.com' ) !== false ) {
+                $settings['github_repo_url'] = $sanitized_url;
+            } else {
+                // Keep the old value if URL is invalid
+                $old_settings = get_option( OPORTUNIDADES_OPTION_NAME, [] );
+                $settings['github_repo_url'] = $old_settings['github_repo_url'] ?? '';
+                add_settings_error(
+                    'oportunidades_settings',
+                    'invalid_github_url',
+                    __( 'URL do GitHub inválida. Use o formato: https://github.com/owner/repo', 'oportunidades' ),
+                    'error'
+                );
+            }
+        } else {
+            // Keep the old value if empty
+            $old_settings = get_option( OPORTUNIDADES_OPTION_NAME, [] );
+            $settings['github_repo_url'] = $old_settings['github_repo_url'] ?? '';
+        }
+
         $settings['github_branch']       = sanitize_text_field( $settings['github_branch'] ?? 'main' );
         $settings['github_file_path']    = sanitize_text_field( $settings['github_file_path'] ?? 'output/oportunidades.json' );
 
@@ -226,9 +256,14 @@ class Admin {
      */
     public function render_github_repo_url_field() {
         $settings = get_option( OPORTUNIDADES_OPTION_NAME, [] );
-        $value    = $settings['github_repo_url'] ?? 'https://github.com/dmarketeer/import-diariodarepublica-serie-ii';
+        $value    = $settings['github_repo_url'] ?? '';
+
+        // Set default value if empty
+        if ( empty( $value ) ) {
+            $value = 'https://github.com/dmarketeer/import-diariodarepublica-serie-ii';
+        }
         ?>
-        <input type="url" name="<?php echo esc_attr( OPORTUNIDADES_OPTION_NAME . '[github_repo_url]' ); ?>" value="<?php echo esc_attr( $value ); ?>" class="regular-text" placeholder="https://github.com/user/repo" />
+        <input type="url" name="<?php echo esc_attr( OPORTUNIDADES_OPTION_NAME . '[github_repo_url]' ); ?>" value="<?php echo esc_attr( $value ); ?>" class="regular-text" placeholder="https://github.com/user/repo" required />
         <p class="description"><?php esc_html_e( 'URL completa do repositório GitHub (ex.: https://github.com/user/repo)', 'oportunidades' ); ?></p>
         <?php
     }
