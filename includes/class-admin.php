@@ -29,6 +29,7 @@ class Admin {
         add_action( 'admin_menu', [ $this, 'register_menu' ] );
         add_action( 'admin_init', [ $this, 'register_settings' ] );
         add_action( 'admin_post_oportunidades_import', [ $this, 'handle_manual_import' ] );
+        add_action( 'admin_post_oportunidades_github_sync', [ $this, 'handle_github_sync' ] );
         add_action( 'admin_post_oportunidades_reset', [ $this, 'handle_reset' ] );
         add_action( 'admin_enqueue_scripts', [ $this, 'enqueue_assets' ] );
     }
@@ -103,6 +104,32 @@ class Admin {
             'oportunidades',
             'oportunidades_general'
         );
+
+        add_settings_section( 'oportunidades_github', __( 'Integração GitHub', 'oportunidades' ), '__return_false', 'oportunidades' );
+
+        add_settings_field(
+            'github_repo_url',
+            __( 'URL do Repositório GitHub', 'oportunidades' ),
+            [ $this, 'render_github_repo_url_field' ],
+            'oportunidades',
+            'oportunidades_github'
+        );
+
+        add_settings_field(
+            'github_branch',
+            __( 'Branch', 'oportunidades' ),
+            [ $this, 'render_github_branch_field' ],
+            'oportunidades',
+            'oportunidades_github'
+        );
+
+        add_settings_field(
+            'github_file_path',
+            __( 'Caminho do Ficheiro de Dados', 'oportunidades' ),
+            [ $this, 'render_github_file_path_field' ],
+            'oportunidades',
+            'oportunidades_github'
+        );
     }
 
     /**
@@ -115,6 +142,9 @@ class Admin {
         $settings['notification_emails'] = implode( ',', array_filter( array_map( 'sanitize_email', explode( ',', $settings['notification_emails'] ?? '' ) ) ) );
         $settings['default_filters']     = array_filter( array_map( 'sanitize_text_field', explode( ',', $settings['default_filters'] ?? '' ) ) );
         $settings['custom_field_map']    = sanitize_textarea_field( $settings['custom_field_map'] ?? '' );
+        $settings['github_repo_url']     = esc_url_raw( $settings['github_repo_url'] ?? '' );
+        $settings['github_branch']       = sanitize_text_field( $settings['github_branch'] ?? 'main' );
+        $settings['github_file_path']    = sanitize_text_field( $settings['github_file_path'] ?? 'output/oportunidades.json' );
 
         return $settings;
     }
@@ -192,6 +222,42 @@ class Admin {
     }
 
     /**
+     * Render GitHub repository URL field.
+     */
+    public function render_github_repo_url_field() {
+        $settings = get_option( OPORTUNIDADES_OPTION_NAME, [] );
+        $value    = $settings['github_repo_url'] ?? 'https://github.com/dmarketeer/import-diariodarepublica-serie-ii';
+        ?>
+        <input type="url" name="<?php echo esc_attr( OPORTUNIDADES_OPTION_NAME . '[github_repo_url]' ); ?>" value="<?php echo esc_attr( $value ); ?>" class="regular-text" placeholder="https://github.com/user/repo" />
+        <p class="description"><?php esc_html_e( 'URL completa do repositório GitHub (ex.: https://github.com/user/repo)', 'oportunidades' ); ?></p>
+        <?php
+    }
+
+    /**
+     * Render GitHub branch field.
+     */
+    public function render_github_branch_field() {
+        $settings = get_option( OPORTUNIDADES_OPTION_NAME, [] );
+        $value    = $settings['github_branch'] ?? 'main';
+        ?>
+        <input type="text" name="<?php echo esc_attr( OPORTUNIDADES_OPTION_NAME . '[github_branch]' ); ?>" value="<?php echo esc_attr( $value ); ?>" class="regular-text" placeholder="main" />
+        <p class="description"><?php esc_html_e( 'Branch do repositório a usar (ex.: main, master, develop)', 'oportunidades' ); ?></p>
+        <?php
+    }
+
+    /**
+     * Render GitHub file path field.
+     */
+    public function render_github_file_path_field() {
+        $settings = get_option( OPORTUNIDADES_OPTION_NAME, [] );
+        $value    = $settings['github_file_path'] ?? 'output/oportunidades.json';
+        ?>
+        <input type="text" name="<?php echo esc_attr( OPORTUNIDADES_OPTION_NAME . '[github_file_path]' ); ?>" value="<?php echo esc_attr( $value ); ?>" class="regular-text" placeholder="output/oportunidades.json" />
+        <p class="description"><?php esc_html_e( 'Caminho relativo para o ficheiro JSON no repositório', 'oportunidades' ); ?></p>
+        <?php
+    }
+
+    /**
      * Render settings page.
      */
     public function render_settings_page() {
@@ -241,6 +307,24 @@ class Admin {
             </form>
 
             <hr />
+            <h2><?php esc_html_e( 'Sincronizar do GitHub', 'oportunidades' ); ?></h2>
+            <form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+                <?php wp_nonce_field( 'oportunidades_github_sync' ); ?>
+                <input type="hidden" name="action" value="oportunidades_github_sync" />
+                <p class="description">
+                    <?php
+                    $last_github_fetch = get_option( 'oportunidades_last_github_fetch' );
+                    if ( $last_github_fetch ) {
+                        echo esc_html( sprintf( __( 'Última sincronização: %s', 'oportunidades' ), get_date_from_gmt( $last_github_fetch, 'd/m/Y H:i' ) ) );
+                    } else {
+                        echo esc_html__( 'Nunca sincronizado', 'oportunidades' );
+                    }
+                    ?>
+                </p>
+                <?php submit_button( __( 'Sincronizar agora', 'oportunidades' ), 'secondary' ); ?>
+            </form>
+
+            <hr />
             <h2><?php esc_html_e( 'Reposição de dados', 'oportunidades' ); ?></h2>
             <form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
                 <?php wp_nonce_field( 'oportunidades_reset' ); ?>
@@ -266,6 +350,30 @@ class Admin {
             <div id="oportunidades-admin-table"></div>
         </div>
         <?php
+    }
+
+    /**
+     * Handle GitHub synchronization.
+     */
+    public function handle_github_sync() {
+        if ( ! current_user_can( 'manage_options' ) || ! check_admin_referer( 'oportunidades_github_sync' ) ) {
+            wp_die( esc_html__( 'Sem permissões.', 'oportunidades' ) );
+        }
+
+        require_once __DIR__ . '/class-github-fetcher.php';
+
+        $github_fetcher = new GitHub_Fetcher();
+        $settings       = get_option( OPORTUNIDADES_OPTION_NAME, [] );
+
+        try {
+            $summary = $github_fetcher->fetch_and_import( $this->importer, $settings );
+            set_transient( 'oportunidades_last_summary', $summary, MINUTE_IN_SECONDS * 30 );
+        } catch ( Exception $e ) {
+            set_transient( 'oportunidades_last_errors', [ $e->getMessage() ], MINUTE_IN_SECONDS * 30 );
+        }
+
+        wp_safe_redirect( wp_get_referer() );
+        exit;
     }
 
     /**

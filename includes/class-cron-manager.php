@@ -14,11 +14,13 @@ class Cron_Manager {
     protected $importer;
 
     const CRON_HOOK = 'oportunidades_process_local_file';
+    const GITHUB_SYNC_HOOK = 'oportunidades_github_sync';
 
     public function __construct( Importer $importer ) {
         $this->importer = $importer;
 
         add_action( self::CRON_HOOK, [ $this, 'process_local_file' ] );
+        add_action( self::GITHUB_SYNC_HOOK, [ $this, 'process_github_sync' ] );
     }
 
     /**
@@ -27,6 +29,10 @@ class Cron_Manager {
     public static function schedule_events() {
         if ( ! wp_next_scheduled( self::CRON_HOOK ) ) {
             wp_schedule_event( time(), 'hourly', self::CRON_HOOK );
+        }
+
+        if ( ! wp_next_scheduled( self::GITHUB_SYNC_HOOK ) ) {
+            wp_schedule_event( time(), 'hourly', self::GITHUB_SYNC_HOOK );
         }
 
         if ( ! wp_next_scheduled( 'oportunidades_send_digest' ) ) {
@@ -44,6 +50,7 @@ class Cron_Manager {
      */
     public static function clear_events() {
         wp_clear_scheduled_hook( self::CRON_HOOK );
+        wp_clear_scheduled_hook( self::GITHUB_SYNC_HOOK );
         wp_clear_scheduled_hook( 'oportunidades_send_digest' );
     }
 
@@ -74,5 +81,32 @@ class Cron_Manager {
 
         $this->importer->import( $payload, 'cron' );
         update_option( 'oportunidades_last_local_sync', time() );
+    }
+
+    /**
+     * Process GitHub sync respecting sync interval.
+     */
+    public function process_github_sync() {
+        $settings = get_option( OPORTUNIDADES_OPTION_NAME, [] );
+        $repo_url = $settings['github_repo_url'] ?? '';
+
+        if ( empty( $repo_url ) ) {
+            return;
+        }
+
+        $interval = max( 15, (int) ( $settings['sync_interval'] ?? 1440 ) );
+        $last_run = (int) get_option( 'oportunidades_last_github_sync', 0 );
+
+        if ( $last_run && ( time() - $last_run ) < ( $interval * MINUTE_IN_SECONDS ) ) {
+            return;
+        }
+
+        try {
+            $github_fetcher = new GitHub_Fetcher();
+            $github_fetcher->fetch_and_import( $this->importer, $settings );
+            update_option( 'oportunidades_last_github_sync', time() );
+        } catch ( \Exception $e ) {
+            error_log( 'Oportunidades GitHub Sync Error: ' . $e->getMessage() );
+        }
     }
 }
