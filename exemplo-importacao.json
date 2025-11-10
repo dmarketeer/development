@@ -1,0 +1,53 @@
+{
+  "schema_version": "1.0",
+  "oportunidades": [
+    {
+      "identificador": "TEST-2025-001",
+      "titulo": "Reabilitação de Fachada - Edifício Central",
+      "resumo": "Projeto de reabilitação completa da fachada principal do edifício histórico localizado no centro da cidade. Inclui restauro de cantaria, substituição de caixilharia e aplicação de revestimentos.",
+      "entidade_adjudicante": "Município de Lisboa",
+      "valor_normalizado": 250000.00,
+      "prazo": "2025-06-30",
+      "url": "https://www.base.gov.pt/exemplo/oportunidade-001",
+      "categorias": ["Reabilitação", "Construção Civil"],
+      "filtros": ["Fachadas", "LSF", "Histórico"],
+      "campos_personalizados": {
+        "distrito": "Lisboa",
+        "concelho": "Lisboa",
+        "tipo_contrato": "Empreitada"
+      }
+    },
+    {
+      "identificador": "TEST-2025-002",
+      "titulo": "Construção de Cobertura em LSF",
+      "resumo": "Construção de nova cobertura utilizando sistema Light Steel Framing (LSF) em edifício comercial. Área aproximada de 500m².",
+      "entidade_adjudicante": "Empresa XYZ Lda",
+      "valor_normalizado": 85000.00,
+      "prazo": "2025-05-15",
+      "url": "https://www.base.gov.pt/exemplo/oportunidade-002",
+      "categorias": ["Construção Civil", "LSF"],
+      "filtros": ["LSF", "Coberturas"],
+      "campos_personalizados": {
+        "distrito": "Porto",
+        "concelho": "Porto",
+        "tipo_contrato": "Empreitada"
+      }
+    },
+    {
+      "identificador": "TEST-2025-003",
+      "titulo": "Isolamento Térmico de Edifício Residencial",
+      "resumo": "Aplicação de sistema de isolamento térmico pelo exterior (ETICS) em edifício residencial com 4 pisos. Inclui preparação de superfícies e acabamentos finais.",
+      "entidade_adjudicante": "Condomínio Residencial ABC",
+      "valor_normalizado": 120000.00,
+      "prazo": "2025-07-20",
+      "url": "https://www.base.gov.pt/exemplo/oportunidade-003",
+      "categorias": ["Reabilitação", "Eficiência Energética"],
+      "filtros": ["ETICS", "Isolamento"],
+      "campos_personalizados": {
+        "distrito": "Braga",
+        "concelho": "Braga",
+        "tipo_contrato": "Prestação de Serviços"
+      }
+    }
+  ]
+}
