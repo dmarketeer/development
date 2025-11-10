@@ -1,0 +1,65 @@
+name: Tests
+
+on:
+  push:
+    branches: [ main, master, develop, claude/** ]
+  pull_request:
+    branches: [ main, master, develop ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    env:
+      WP_DB_PREFIX: ${{ vars.WP_DB_PREFIX || 'wpac_' }}
+      WP_DB_NAME: wordpress_test
+      WP_DB_USER: root
+      WP_DB_PASSWORD: root
+      WP_DB_HOST: 127.0.0.1
+
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: wordpress_test
+        ports:
+          - 3306:3306
+        options: --health-cmd="mysqladmin ping" --health-interval=10s --health-timeout=5s --health-retries=3
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.1'
+          extensions: mysqli, mbstring, xml
+          coverage: none
+
+      - name: Install Composer dependencies
+        run: |
+          if [ -f composer.json ]; then
+            composer install --prefer-dist --no-progress --no-suggest
+          fi
+
+      - name: Setup WordPress test environment
+        run: |
+          # Install WordPress test suite
+          bash bin/install-wp-tests.sh $WP_DB_NAME $WP_DB_USER $WP_DB_PASSWORD $WP_DB_HOST latest true
+        if: false  # Descomente quando o script install-wp-tests.sh existir
+
+      - name: Display environment info
+        run: |
+          echo "WordPress DB Prefix: $WP_DB_PREFIX"
+          echo "WordPress DB Name: $WP_DB_NAME"
+          echo "PHP Version: $(php -v)"
+
+      - name: Run PHPUnit tests
+        run: |
+          if [ -f phpunit.xml ] || [ -f phpunit.xml.dist ]; then
+            vendor/bin/phpunit
+          else
+            echo "Nenhuma configuração PHPUnit encontrada. Ignorando testes."
+          fi
