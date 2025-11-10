@@ -66,17 +66,29 @@ class Importer {
      * Normalizes a single record.
      */
     protected function normalize_record( array $item, $schema_version, $origin, array $settings ) {
-        $title = sanitize_text_field( $item['titulo'] ?? $item['title'] ?? '' );
+        // Mapeamento de campos alternativos do Google Sheets
+        $title = sanitize_text_field(
+            $item['titulo'] ??
+            $item['title'] ??
+            $item['Contrato'] ??  // Campo "Contrato" do Google Sheets
+            ''
+        );
         if ( empty( $title ) ) {
             throw new Exception( __( 'Registo sem título.', 'oportunidades' ) );
         }
 
-        $deadline = $item['prazo'] ?? $item['deadline'] ?? null;
+        $deadline = $item['prazo'] ??
+                    $item['deadline'] ??
+                    $item['Prazo das propostas'] ??  // Campo do Google Sheets
+                    null;
         if ( $deadline ) {
             $deadline = $this->parse_date( $deadline );
         }
 
-        $value = $item['valor_normalizado'] ?? $item['valor'] ?? null;
+        $value = $item['valor_normalizado'] ??
+                 $item['valor'] ??
+                 $item['Preço base s/IVA (€)'] ??  // Campo do Google Sheets
+                 null;
         if ( null !== $value ) {
             $value = floatval( preg_replace( '/[^0-9.,-]/', '', (string) $value ) );
         }
@@ -92,6 +104,17 @@ class Importer {
             $custom_fields = [];
         }
 
+        // Adicionar campos do Google Sheets aos custom_fields
+        if ( isset( $item['Distrito'] ) ) {
+            $custom_fields['distrito'] = sanitize_text_field( $item['Distrito'] );
+        }
+        if ( isset( $item['Prazo'] ) ) {
+            $custom_fields['prazo_execucao'] = sanitize_text_field( $item['Prazo'] );
+        }
+        if ( isset( $item['Data do Anúncio'] ) ) {
+            $custom_fields['data_anuncio'] = sanitize_text_field( $item['Data do Anúncio'] );
+        }
+
         if ( ! empty( $settings['custom_field_map'] ) ) {
             $map = json_decode( $settings['custom_field_map'], true );
             if ( is_array( $map ) ) {
@@ -104,19 +127,19 @@ class Importer {
         }
 
         $hash = $this->calculate_hash( [
-            $item['identificador'] ?? $item['id'] ?? $title,
+            $item['identificador'] ?? $item['id'] ?? $item['Anúncio'] ?? $title,
             $deadline,
             $value,
         ] );
 
         return [
-            'external_id'      => sanitize_text_field( $item['identificador'] ?? $item['id'] ?? '' ),
+            'external_id'      => sanitize_text_field( $item['identificador'] ?? $item['id'] ?? $item['Anúncio'] ?? '' ),
             'title'            => $title,
-            'summary'          => wp_kses_post( $item['resumo'] ?? $item['descricao'] ?? $item['summary'] ?? '' ),
-            'awarding_entity'  => sanitize_text_field( $item['entidade_adjudicante'] ?? $item['entity'] ?? '' ),
+            'summary'          => wp_kses_post( $item['resumo'] ?? $item['descricao'] ?? $item['Descrição'] ?? $item['summary'] ?? '' ),
+            'awarding_entity'  => sanitize_text_field( $item['entidade_adjudicante'] ?? $item['Adjudicante'] ?? $item['entity'] ?? '' ),
             'value_normalized' => $value,
             'deadline_date'    => $deadline,
-            'url'              => esc_url_raw( $item['url'] ?? $item['link'] ?? '' ),
+            'url'              => esc_url_raw( $item['url'] ?? $item['link'] ?? $item['Link PDF'] ?? '' ),
             'categories'       => $categories,
             'filters'          => $filters,
             'custom_fields'    => $custom_fields,
