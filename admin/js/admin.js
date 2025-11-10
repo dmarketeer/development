@@ -50,17 +50,22 @@
             render( createElement( Table, { rows: data.tableData } ), container );
         }
 
-        // GitHub configuration validation
-        const validateButton = document.getElementById( 'validate-github-config' );
+        // Google Sheets configuration validation
+        const validateButton = document.getElementById( 'validate-sheets-config' );
         if ( validateButton ) {
             validateButton.addEventListener( 'click', function() {
-                const resultDiv = document.getElementById( 'github-validation-result' );
-                const repoUrl = document.querySelector( 'input[name="oportunidades_settings[github_repo_url]"]' ).value;
-                const branch = document.querySelector( 'input[name="oportunidades_settings[github_branch]"]' ).value;
-                const filePath = document.querySelector( 'input[name="oportunidades_settings[github_file_path]"]' ).value;
+                const resultDiv = document.getElementById( 'sheets-validation-result' );
+                const spreadsheetId = document.querySelector( 'input[name="oportunidades_settings[sheets_spreadsheet_id]"]' ).value;
+                const range = document.querySelector( 'input[name="oportunidades_settings[sheets_range]"]' ).value;
+                const apiKey = document.querySelector( 'input[name="oportunidades_settings[sheets_api_key]"]' ).value;
 
-                if ( ! repoUrl ) {
-                    resultDiv.innerHTML = '<div class="notice notice-error inline"><p>Por favor, preencha a URL do repositório.</p></div>';
+                if ( ! spreadsheetId ) {
+                    resultDiv.innerHTML = '<div class="notice notice-error inline"><p>Por favor, preencha o ID da planilha.</p></div>';
+                    return;
+                }
+
+                if ( ! apiKey ) {
+                    resultDiv.innerHTML = '<div class="notice notice-error inline"><p>Por favor, preencha a API Key.</p></div>';
                     return;
                 }
 
@@ -75,11 +80,11 @@
                         'Content-Type': 'application/x-www-form-urlencoded',
                     },
                     body: new URLSearchParams( {
-                        action: 'oportunidades_validate_github',
+                        action: 'oportunidades_validate_sheets',
                         nonce: data.validateNonce || '',
-                        repo_url: repoUrl,
-                        branch: branch,
-                        file_path: filePath
+                        spreadsheet_id: spreadsheetId,
+                        range: range,
+                        api_key: apiKey
                     } )
                 } )
                 .then( response => response.json() )
