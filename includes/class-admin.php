@@ -447,6 +447,7 @@ class Admin {
         try {
             $this->database->reset();
             delete_option( 'oportunidades_last_ingestion' );
+            delete_option( 'oportunidades_last_github_sync' );
             delete_option( 'oportunidades_cache_version' );
             delete_transient( 'oportunidades_last_summary' );
             delete_transient( 'oportunidades_last_errors' );
