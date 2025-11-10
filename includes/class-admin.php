@@ -149,7 +149,8 @@ class Admin {
         $settings['default_filters']     = array_filter( array_map( 'sanitize_text_field', explode( ',', $settings['default_filters'] ?? '' ) ) );
         $settings['custom_field_map']    = sanitize_textarea_field( $settings['custom_field_map'] ?? '' );
         $settings['github_repo']         = sanitize_text_field( $settings['github_repo'] ?? '' );
-        $settings['github_branch']       = sanitize_text_field( $settings['github_branch'] ?? 'main' );
+        $branch                          = sanitize_text_field( $settings['github_branch'] ?? 'main' );
+        $settings['github_branch']       = $branch ?: 'main';
         $settings['github_path']         = trim( sanitize_text_field( $settings['github_path'] ?? '' ), '/' );
 
         return $settings;
@@ -362,8 +363,10 @@ class Admin {
             wp_die( esc_html__( 'Sem permissões.', 'oportunidades' ) );
         }
 
+        $redirect = wp_get_referer() ? wp_get_referer() : admin_url( 'admin.php?page=oportunidades' );
+
         if ( empty( $_FILES['oportunidades_file']['tmp_name'] ) ) {
-            wp_safe_redirect( add_query_arg( 'oportunidades_error', 'missing_file', wp_get_referer() ) );
+            wp_safe_redirect( add_query_arg( 'oportunidades_error', 'missing_file', $redirect ) );
             exit;
         }
 
@@ -384,7 +387,7 @@ class Admin {
             set_transient( 'oportunidades_last_errors', [ $e->getMessage() ], MINUTE_IN_SECONDS * 30 );
         }
 
-        wp_safe_redirect( wp_get_referer() );
+        wp_safe_redirect( $redirect );
         exit;
     }
 
