@@ -50,6 +50,14 @@ titulo | resumo | identificador | entidade_adjudicante | valor_normalizado | pra
 title | summary | id | entity | valor_normalizado | deadline | url | categories | filters
 ```
 
+**OU** utilize os cabeçalhos oficiais do Portal BASE (mapeados automaticamente):
+
+```
+Anúncio | Adjudicante | Data do Anúncio | Preço base s/IVA (€) | Contrato | Descrição | Distrito | Prazo | Prazo das propostas | Link PDF
+```
+
+> ✅ Estes cabeçalhos são importados directamente e cada campo é convertido para os atributos internos do plugin. O `Contrato` passa a ser o título, `Descrição` o resumo, `Prazo das propostas` o deadline, `Link PDF` a URL e todos os restantes campos ficam disponíveis em `custom_fields`.
+
 **⚠️ IMPORTANTE:** O campo `titulo` (ou `title`) é **OBRIGATÓRIO**!
 
 ---

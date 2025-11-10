@@ -128,7 +128,10 @@ class Google_Sheets_Fetcher {
 		$rows = $sheets_data['values'];
 
 		// First row should be the header
-		$header = array_shift( $rows );
+                $header = array_shift( $rows );
+
+                // Normalizar valores do cabeçalho para evitar espaços em branco extras
+                $header = $this->normalize_header_row( $header );
 
 		if ( empty( $header ) ) {
 			return new \WP_Error(
@@ -138,28 +141,85 @@ class Google_Sheets_Fetcher {
 		}
 
 		$oportunidades = [];
-		foreach ( $rows as $row ) {
-			// Skip empty rows
-			if ( empty( array_filter( $row ) ) ) {
-				continue;
-			}
+                foreach ( $rows as $row ) {
+                        $row = $this->normalize_data_row( $row, count( $header ) );
 
-			// Ensure row has same number of columns as header (pad with empty strings if needed)
-			$row = array_pad( $row, count( $header ), '' );
+                        if ( $this->row_is_effectively_empty( $row ) ) {
+                                continue;
+                        }
 
-			// Combine header with row values
-			$item = array_combine( $header, $row );
+                        // Combine header with row values
+                        $item = array_combine( $header, $row );
 
 			if ( $item !== false ) {
 				$oportunidades[] = $item;
 			}
 		}
 
-		return [
-			'schema_version' => '1.0',
-			'oportunidades'  => $oportunidades,
-		];
-	}
+                return [
+                        'schema_version' => '1.0',
+                        'oportunidades'  => $oportunidades,
+                ];
+        }
+
+        /**
+         * Normalize header row values.
+         *
+         * @param array $header Raw header row from Google Sheets
+         * @return array Normalized header values
+         */
+        protected function normalize_header_row( array $header ) {
+                return array_map(
+                        function ( $value ) {
+                                return is_string( $value ) ? trim( $value ) : $value;
+                        },
+                        $header
+                );
+        }
+
+        /**
+         * Normalize a data row to match the header size.
+         *
+         * @param array $row Data row values
+         * @param int   $target_length Header length to match
+         * @return array Normalized row
+         */
+        protected function normalize_data_row( array $row, $target_length ) {
+                $row = array_map(
+                        function ( $value ) {
+                                return is_string( $value ) ? trim( $value ) : $value;
+                        },
+                        $row
+                );
+
+                if ( count( $row ) < $target_length ) {
+                        $row = array_pad( $row, $target_length, '' );
+                } elseif ( count( $row ) > $target_length ) {
+                        $row = array_slice( $row, 0, $target_length );
+                }
+
+                return $row;
+        }
+
+        /**
+         * Check if the row is effectively empty (only blank strings or nulls).
+         *
+         * @param array $row Normalized row values
+         * @return bool True when row has no meaningful values
+         */
+        protected function row_is_effectively_empty( array $row ) {
+                foreach ( $row as $value ) {
+                        if ( is_string( $value ) ) {
+                                if ( $value !== '' ) {
+                                        return false;
+                                }
+                        } elseif ( null !== $value ) {
+                                return false;
+                        }
+                }
+
+                return true;
+        }
 
 	/**
 	 * Validate Google Sheets configuration.

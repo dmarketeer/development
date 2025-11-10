@@ -500,14 +500,32 @@ class Admin {
      * Parse CSV to dataset structure.
      */
     protected function parse_csv( $content ) {
-        $rows = array_map( 'str_getcsv', preg_split( '/\r\n|\n|\r/', trim( $content ) ) );
+        $rows   = array_map( 'str_getcsv', preg_split( '/\r\n|\n|\r/', trim( $content ) ) );
         $header = array_shift( $rows );
+
+        if ( empty( $header ) ) {
+            return [
+                'schema_version' => '1.0',
+                'oportunidades'  => [],
+            ];
+        }
+
+        $header = array_map( [ $this, 'normalize_csv_value' ], $header );
 
         $items = [];
         foreach ( $rows as $row ) {
-            if ( count( $row ) !== count( $header ) ) {
+            $row = array_map( [ $this, 'normalize_csv_value' ], $row );
+
+            if ( $this->csv_row_is_empty( $row ) ) {
                 continue;
             }
+
+            if ( count( $row ) < count( $header ) ) {
+                $row = array_pad( $row, count( $header ), '' );
+            } elseif ( count( $row ) > count( $header ) ) {
+                $row = array_slice( $row, 0, count( $header ) );
+            }
+
             $items[] = array_combine( $header, $row );
         }
 
@@ -515,6 +533,30 @@ class Admin {
             'schema_version' => '1.0',
             'oportunidades'  => $items,
         ];
+    }
+
+    /**
+     * Normalize value imported from CSV.
+     */
+    protected function normalize_csv_value( $value ) {
+        return is_string( $value ) ? trim( $value ) : $value;
+    }
+
+    /**
+     * Check if a CSV row has meaningful values.
+     */
+    protected function csv_row_is_empty( array $row ) {
+        foreach ( $row as $value ) {
+            if ( is_string( $value ) ) {
+                if ( $value !== '' ) {
+                    return false;
+                }
+            } elseif ( null !== $value ) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /**
