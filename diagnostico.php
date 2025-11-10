@@ -8,12 +8,30 @@
  * 3. Delete o arquivo após o diagnóstico
  */
 
-// Carregar WordPress
-require_once __DIR__ . '/../../wp-load.php';
+// Tentar encontrar e carregar WordPress
+$wp_load_paths = [
+    __DIR__ . '/wp-load.php',                          // Raiz do WordPress
+    __DIR__ . '/../wp-load.php',                       // Um nível acima
+    __DIR__ . '/../../wp-load.php',                    // Dois níveis acima
+    __DIR__ . '/../../../wp-load.php',                 // Três níveis acima (se no plugin)
+];
+
+$wp_loaded = false;
+foreach ($wp_load_paths as $path) {
+    if (file_exists($path)) {
+        require_once $path;
+        $wp_loaded = true;
+        break;
+    }
+}
+
+if (!$wp_loaded) {
+    die('Erro: Não foi possível encontrar o wp-load.php. Certifique-se de colocar este arquivo na raiz do WordPress.');
+}
 
 // Verificar permissões
 if (!current_user_can('manage_options')) {
-    die('Acesso negado. Faça login como administrador.');
+    die('Acesso negado. Faça login como administrador primeiro, depois acesse este arquivo.');
 }
 
 ?>
