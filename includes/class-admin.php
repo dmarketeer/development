@@ -32,6 +32,7 @@ class Admin {
         add_action( 'admin_post_oportunidades_github_sync', [ $this, 'handle_github_sync' ] );
         add_action( 'admin_post_oportunidades_reset', [ $this, 'handle_reset' ] );
         add_action( 'admin_enqueue_scripts', [ $this, 'enqueue_assets' ] );
+        add_action( 'wp_ajax_oportunidades_validate_github', [ $this, 'handle_validate_github' ] );
     }
 
     /**
@@ -288,7 +289,11 @@ class Admin {
         $value    = $settings['github_file_path'] ?? 'output/oportunidades.json';
         ?>
         <input type="text" name="<?php echo esc_attr( OPORTUNIDADES_OPTION_NAME . '[github_file_path]' ); ?>" value="<?php echo esc_attr( $value ); ?>" class="regular-text" placeholder="output/oportunidades.json" />
+        <button type="button" id="validate-github-config" class="button button-secondary" style="margin-left: 10px;">
+            <?php esc_html_e( 'Validar Configuração', 'oportunidades' ); ?>
+        </button>
         <p class="description"><?php esc_html_e( 'Caminho relativo para o ficheiro JSON no repositório', 'oportunidades' ); ?></p>
+        <div id="github-validation-result" style="margin-top: 10px;"></div>
         <?php
     }
 
@@ -486,6 +491,34 @@ class Admin {
     }
 
     /**
+     * Handle AJAX request to validate GitHub configuration.
+     */
+    public function handle_validate_github() {
+        check_ajax_referer( 'oportunidades_validate_github', 'nonce' );
+
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( [ 'message' => __( 'Sem permissões.', 'oportunidades' ) ] );
+        }
+
+        $repo_url  = isset( $_POST['repo_url'] ) ? sanitize_text_field( wp_unslash( $_POST['repo_url'] ) ) : '';
+        $branch    = isset( $_POST['branch'] ) ? sanitize_text_field( wp_unslash( $_POST['branch'] ) ) : 'main';
+        $file_path = isset( $_POST['file_path'] ) ? sanitize_text_field( wp_unslash( $_POST['file_path'] ) ) : 'output/oportunidades.json';
+
+        if ( empty( $repo_url ) ) {
+            wp_send_json_error( [ 'message' => __( 'URL do repositório é obrigatória.', 'oportunidades' ) ] );
+        }
+
+        $fetcher = new GitHub_Fetcher();
+        $result  = $fetcher->validate_config( $repo_url, $branch, $file_path );
+
+        if ( is_wp_error( $result ) ) {
+            wp_send_json_error( [ 'message' => $result->get_error_message() ] );
+        }
+
+        wp_send_json_success( [ 'message' => __( 'Configuração válida! O ficheiro foi encontrado no repositório.', 'oportunidades' ) ] );
+    }
+
+    /**
      * Parse CSV to dataset structure.
      */
     protected function parse_csv( $content ) {
@@ -521,11 +554,12 @@ class Admin {
             'oportunidades-admin',
             'OportunidadesAdmin',
             [
-                'restUrl'   => rest_url( 'oportunidades/v1/import' ),
-                'nonce'     => wp_create_nonce( 'wp_rest' ),
-                'token'     => get_option( OPORTUNIDADES_OPTION_NAME, [] )['api_token'] ?? '',
-                'summary'   => get_transient( 'oportunidades_last_summary' ),
-                'tableData' => $this->database->query_records( [ 'per_page' => 50 ] ),
+                'restUrl'       => rest_url( 'oportunidades/v1/import' ),
+                'nonce'         => wp_create_nonce( 'wp_rest' ),
+                'validateNonce' => wp_create_nonce( 'oportunidades_validate_github' ),
+                'token'         => get_option( OPORTUNIDADES_OPTION_NAME, [] )['api_token'] ?? '',
+                'summary'       => get_transient( 'oportunidades_last_summary' ),
+                'tableData'     => $this->database->query_records( [ 'per_page' => 50 ] ),
             ]
         );
     }
