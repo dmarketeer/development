@@ -6,6 +6,7 @@ use Oportunidades\Includes\Cron_Manager;
 use Oportunidades\Includes\Database;
 use Oportunidades\Includes\Emailer;
 use Oportunidades\Includes\Frontend;
+use Oportunidades\Includes\Github_Fetcher;
 use Oportunidades\Includes\Importer;
 use Oportunidades\Includes\Rest_API;
 
@@ -20,6 +21,7 @@ require_once __DIR__ . '/class-rest-api.php';
 require_once __DIR__ . '/class-admin.php';
 require_once __DIR__ . '/class-frontend.php';
 require_once __DIR__ . '/class-emailer.php';
+require_once __DIR__ . '/class-github-fetcher.php';
 require_once __DIR__ . '/class-cron-manager.php';
 
 class Plugin {
@@ -40,12 +42,20 @@ class Plugin {
     public $importer;
 
     /**
+     * GitHub fetcher instance.
+     *
+     * @var Github_Fetcher
+     */
+    protected $github_fetcher;
+
+    /**
      * Plugin bootstrap.
      */
     protected function __construct() {
         $this->define_constants();
-        $this->database = new Database();
-        $this->importer = new Importer( $this->database );
+        $this->database       = new Database();
+        $this->importer       = new Importer( $this->database );
+        $this->github_fetcher = new Github_Fetcher();
 
         register_activation_hook( OPORTUNIDADES_PLUGIN_FILE, [ $this, 'activate' ] );
         register_deactivation_hook( OPORTUNIDADES_PLUGIN_FILE, [ $this, 'deactivate' ] );
@@ -74,10 +84,10 @@ class Plugin {
      */
     public function init_components() {
         new Rest_API( $this->importer );
-        new Admin( $this->importer, $this->database );
+        new Admin( $this->importer, $this->database, $this->github_fetcher );
         new Frontend( $this->database );
         new Emailer( $this->database );
-        new Cron_Manager( $this->importer );
+        new Cron_Manager( $this->importer, $this->github_fetcher );
     }
 
     /**
